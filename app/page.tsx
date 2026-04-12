@@ -44,7 +44,7 @@ const FEATURES = [
 const EXAMPLE_QUERIES = [
   { category: "Constitutional law", query: "Find High Court cases about constitutional implied freedoms" },
   { category: "Legal concepts", query: "What is a sub bailee?" },
-  { category: "Procedure & costs", query: "In the UCPR what rule deals with compliance expenses for a subpoena in the NSW UCPR and what do cases say about reasonable compliance expenses?" },
+  { category: "Procedure & costs", query: "In the NSW UCPR what rule deals with compliance expenses for a subpoena? What do cases say about reasonable compliance expenses?" },
   { category: "Comparing jurisdictions", query: "Compare how Victoria and NSW courts have treated non-compete clauses" },
 ];
 
