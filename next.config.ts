@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: ["auslaw-mcp"],
+  allowedDevOrigins: ["http://richeyserver:3002"],
 };
 
 export default nextConfig;
