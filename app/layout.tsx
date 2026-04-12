@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AusLaw MCP Test",
-  description: "Test harness for the auslaw-mcp server",
+  title: "WilRic Law MCP Test",
+  description: "Australian legal research powered by auslaw-mcp + Claude API",
 };
 
 export default function RootLayout({
