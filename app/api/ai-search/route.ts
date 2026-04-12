@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { listTools, callTool } from "@/lib/mcp-client";
 
+export const maxDuration = 120;
+
 const anthropic = new Anthropic();
 
 const SYSTEM_PROMPT = `You are an Australian legal research assistant. Use the provided tools to search for cases and legislation on AustLII.

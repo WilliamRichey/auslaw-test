@@ -29,12 +29,14 @@ async function getClient(): Promise<Client> {
 
 export async function listTools() {
   const c = await getClient();
-  const result = await c.listTools();
+  const result = await c.listTools(undefined, { timeout: 30000 });
   return result.tools;
 }
 
 export async function callTool(name: string, args: Record<string, unknown>) {
   const c = await getClient();
-  const result = await c.callTool({ name, arguments: args });
+  const result = await c.callTool({ name, arguments: args }, undefined, {
+    timeout: 120000,
+  });
   return result.content;
 }
