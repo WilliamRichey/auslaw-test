@@ -61,6 +61,9 @@ function LoadingSpinner() {
       <p className="mt-1 text-xs text-zinc-400">
         AI searches may take 10-30 seconds
       </p>
+      <p className="mt-1 text-xs text-zinc-400">
+        AustLII will try to block this IP address. I will need to challenge it for access. If this does not work try again in a few minutes or run locally on your server with a different IP.
+      </p>
     </div>
   );
 }
