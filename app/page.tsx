@@ -219,7 +219,7 @@ export default function Home() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={
                   mode === "ai"
-                    ? "Ask a question, e.g. 'Find recent NCAT cases about residential tenancy bonds'"
+                    ? "Ask a question, e.g. 'Is a judge able to overturn another judge's case management orders?'"
                     : "Search NSW CaseLaw, e.g. 'negligence duty of care'"
                 }
                 className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
