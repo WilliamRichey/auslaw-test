@@ -1,6 +1,16 @@
 import * as cheerio from "cheerio";
 
 const BASE_URL = "https://www.caselaw.nsw.gov.au";
+
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
+}
 const SEARCH_URL = `${BASE_URL}/search/advanced`;
 const PAGE_SIZE = 20;
 
@@ -208,11 +218,11 @@ export async function searchNSWCaseLaw(
     const citation = citMatch ? citMatch[0] : undefined;
 
     results.push({
-      title: titleText,
+      title: decodeEntities(titleText),
       url: href.startsWith("http") ? href : `${BASE_URL}${href}`,
       decisionDate: decisionDate || undefined,
-      judge: judge || undefined,
-      catchwords: cw || undefined,
+      judge: decodeEntities(judge) || undefined,
+      catchwords: decodeEntities(cw) || undefined,
       citation: citation || undefined,
     });
   });
