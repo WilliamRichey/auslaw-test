@@ -1,36 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
 
 interface SearchResult {
   title: string;
-  neutralCitation?: string;
-  reportedCitation?: string;
   url: string;
-  summary?: string;
-  jurisdiction?: string;
-  year?: string;
-  // NSW CaseLaw fields
   decisionDate?: string;
   judge?: string;
   catchwords?: string;
   citation?: string;
 }
-
-const JURISDICTIONS = [
-  { value: "", label: "All jurisdictions" },
-  { value: "cth", label: "Commonwealth" },
-  { value: "nsw", label: "New South Wales" },
-  { value: "vic", label: "Victoria" },
-  { value: "qld", label: "Queensland" },
-  { value: "sa", label: "South Australia" },
-  { value: "wa", label: "Western Australia" },
-  { value: "tas", label: "Tasmania" },
-  { value: "nt", label: "Northern Territory" },
-  { value: "act", label: "ACT" },
-  { value: "nz", label: "New Zealand" },
-];
 
 const NSW_COURTS = [
   { value: "court_of_appeal", label: "Court of Appeal" },
@@ -65,29 +44,7 @@ const NSW_TRIBUNALS = [
   { value: "transport_appeal", label: "Transport Appeal Boards" },
 ];
 
-const FEATURES = [
-  "Case law search across all Australian and NZ jurisdictions",
-  "Intelligent search relevance with auto-detection of case names vs topics",
-  "Multiple search methods: title, phrase, boolean, proximity",
-  "Legislation search with pagination",
-  "Citation extraction: neutral and reported citations",
-  "AGLC4 citation formatting, validation, and pinpoint generation",
-  "jade.io authenticated fetch and search",
-  "Authority-based ranking by court hierarchy",
-  "Full document retrieval from HTML and PDF sources",
-  "OCR fallback for scanned PDFs via Tesseract",
-  "SSRF protection and rate limiting",
-  "NSW CaseLaw (caselaw.nsw.gov.au) search with court/tribunal filtering",
-];
-
-const EXAMPLE_QUERIES = [
-  { category: "Constitutional law", query: "Find High Court cases about constitutional implied freedoms" },
-  { category: "Legal concepts", query: "What is a sub bailee?" },
-  { category: "Procedure & costs", query: "In the NSW UCPR what rule deals with compliance expenses for a subpoena? What do cases say about reasonable compliance expenses?" },
-  { category: "Comparing jurisdictions", query: "Compare how Victoria and NSW courts have treated non-compete clauses" },
-];
-
-function LoadingSpinner({ mode }: { mode: string }) {
+function LoadingSpinner() {
   return (
     <div className="flex flex-col items-center justify-center py-16">
       <div className="relative">
@@ -95,112 +52,58 @@ function LoadingSpinner({ mode }: { mode: string }) {
         <div className="absolute inset-0 h-12 w-12 animate-spin rounded-full border-4 border-transparent border-t-indigo-600" />
       </div>
       <p className="mt-4 text-sm font-medium text-zinc-500 animate-pulse">
-        {mode === "nsw" ? "Searching NSW CaseLaw..." : "Searching AustLII via MCP server..."}
+        Searching NSW CaseLaw...
       </p>
-      {mode === "ai" && (
-        <>
-          <p className="mt-1 text-xs text-zinc-400">
-            AI searches may take 10-30 seconds
-          </p>
-          <p className="mt-1 text-xs text-zinc-400">
-            AustLII will try to block this IP address. I will need to challenge it for access. If this does not work try again in a few minutes or run locally on your server with a different IP.
-          </p>
-        </>
-      )}
     </div>
   );
 }
 
 export default function Home() {
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<"ai" | "direct" | "nsw">("ai");
-  const [type, setType] = useState<"case" | "legislation">("case");
-  const [jurisdiction, setJurisdiction] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [interpretation, setInterpretation] = useState("");
-  const [searchParams, setSearchParams] = useState<Record<string, string> | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // NSW-specific state
-  const [nswSearchField, setNswSearchField] = useState<"body" | "title" | "catchwords" | "party" | "legislationCited" | "casesCited">("body");
-  const [nswCourts, setNswCourts] = useState<string[]>([]);
-  const [nswTribunals, setNswTribunals] = useState<string[]>([]);
-  const [nswTotalResults, setNswTotalResults] = useState(0);
-  const [nswPage, setNswPage] = useState(0);
-  const [nswTotalPages, setNswTotalPages] = useState(0);
+  const [searchField, setSearchField] = useState<"body" | "title" | "catchwords" | "party" | "legislationCited" | "casesCited">("body");
+  const [courts, setCourts] = useState<string[]>([]);
+  const [tribunals, setTribunals] = useState<string[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
-  async function handleSearch(e: React.FormEvent, page?: number) {
+  async function handleSearch(e: React.FormEvent, p?: number) {
     e.preventDefault();
     if (!query.trim()) return;
 
     setLoading(true);
     setError("");
     setResults([]);
-    setInterpretation("");
-    setSearchParams(null);
     setHasSearched(true);
 
     try {
-      let data;
-      if (mode === "nsw") {
-        const params = new URLSearchParams();
-        params.set(nswSearchField, query);
-        if (nswCourts.length > 0) params.set("courts", nswCourts.join(","));
-        if (nswTribunals.length > 0) params.set("tribunals", nswTribunals.join(","));
-        const p = page ?? 0;
-        params.set("page", String(p));
+      const params = new URLSearchParams();
+      params.set(searchField, query);
+      if (courts.length > 0) params.set("courts", courts.join(","));
+      if (tribunals.length > 0) params.set("tribunals", tribunals.join(","));
+      params.set("page", String(p ?? 0));
 
-        const res = await fetch(`/api/nsw-search?${params}`);
-        if (!res.ok) {
-          const text = await res.text();
-          setError(`Server error ${res.status}: ${text.slice(0, 200)}`);
-          return;
-        }
-        data = await res.json();
-        if (data.error) {
-          setError(data.error);
-          return;
-        }
-        setNswTotalResults(data.totalResults ?? 0);
-        setNswPage(data.page ?? 0);
-        setNswTotalPages(data.totalPages ?? 0);
-        setResults(data.results ?? []);
-        if (!data.results?.length) setError("No results found.");
+      const res = await fetch(`/api/nsw-search?${params}`);
+      if (!res.ok) {
+        const text = await res.text();
+        setError(`Server error ${res.status}: ${text.slice(0, 200)}`);
         return;
-      } else if (mode === "ai") {
-        const res = await fetch("/api/ai-search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: query }),
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          setError(`Server error ${res.status}: ${text.slice(0, 200)}`);
-          return;
-        }
-        data = await res.json();
-        if (data.interpretation) setInterpretation(data.interpretation);
-        if (data.searchParams) setSearchParams(data.searchParams);
-      } else {
-        const params = new URLSearchParams({ query, type });
-        if (jurisdiction) params.set("jurisdiction", jurisdiction);
-        const res = await fetch(`/api/search?${params}`);
-        if (!res.ok) {
-          const text = await res.text();
-          setError(`Server error ${res.status}: ${text.slice(0, 200)}`);
-          return;
-        }
-        data = await res.json();
       }
-
+      const data = await res.json();
       if (data.error) {
         setError(data.error);
-      } else {
-        setResults(data.results ?? []);
-        if (!data.results?.length) setError("No results found.");
+        return;
       }
+      setTotalResults(data.totalResults ?? 0);
+      setPage(data.page ?? 0);
+      setTotalPages(data.totalPages ?? 0);
+      setResults(data.results ?? []);
+      if (!data.results?.length) setError("No results found.");
     } catch (err) {
       setError(`Request failed: ${String(err)}`);
     } finally {
@@ -208,19 +111,14 @@ export default function Home() {
     }
   }
 
-  function handleExampleClick(exampleQuery: string) {
-    setQuery(exampleQuery);
-    setMode("ai");
-  }
-
-  function toggleNswCourt(key: string) {
-    setNswCourts((prev) =>
+  function toggleCourt(key: string) {
+    setCourts((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
   }
 
-  function toggleNswTribunal(key: string) {
-    setNswTribunals((prev) =>
+  function toggleTribunal(key: string) {
+    setTribunals((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     );
   }
@@ -235,7 +133,8 @@ export default function Home() {
               WR
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">WilRic Law MCP Test</h1>
+              <h1 className="text-xl font-bold text-slate-900">NSW CaseLaw Search</h1>
+              <p className="text-xs text-slate-400">caselaw.nsw.gov.au</p>
             </div>
           </div>
         </div>
@@ -244,66 +143,25 @@ export default function Home() {
       <main className="mx-auto max-w-5xl px-6 py-8">
         {/* Search section */}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex gap-1 rounded-lg bg-slate-100 p-1">
-            <button
-              onClick={() => setMode("ai")}
-              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-                mode === "ai"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              AI Search
-            </button>
-            <button
-              onClick={() => setMode("direct")}
-              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-                mode === "direct"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              AustLII Direct
-            </button>
-            <button
-              onClick={() => setMode("nsw")}
-              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-all ${
-                mode === "nsw"
-                  ? "bg-white text-indigo-700 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              NSW CaseLaw
-            </button>
-          </div>
-
           <form onSubmit={handleSearch} className="flex flex-col gap-3">
             <div className="flex gap-3">
-              {mode === "nsw" && (
-                <select
-                  value={nswSearchField}
-                  onChange={(e) => setNswSearchField(e.target.value as typeof nswSearchField)}
-                  className="rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none"
-                >
-                  <option value="body">Full text</option>
-                  <option value="title">Case name</option>
-                  <option value="catchwords">Catchwords</option>
-                  <option value="party">Party name</option>
-                  <option value="legislationCited">Legislation cited</option>
-                  <option value="casesCited">Cases cited</option>
-                </select>
-              )}
+              <select
+                value={searchField}
+                onChange={(e) => setSearchField(e.target.value as typeof searchField)}
+                className="rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none"
+              >
+                <option value="body">Full text</option>
+                <option value="title">Case name</option>
+                <option value="catchwords">Catchwords</option>
+                <option value="party">Party name</option>
+                <option value="legislationCited">Legislation cited</option>
+                <option value="casesCited">Cases cited</option>
+              </select>
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={
-                  mode === "ai"
-                    ? "Ask a question, e.g. 'Show me recent Federal Court decisions about negligence'"
-                    : mode === "nsw"
-                    ? "Search NSW CaseLaw, e.g. 'negligence duty of care'"
-                    : "Search keywords, e.g. 'negligence duty of care'"
-                }
+                placeholder="Search NSW CaseLaw, e.g. 'negligence duty of care'"
                 className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
               <button
@@ -323,83 +181,50 @@ export default function Home() {
               </button>
             </div>
 
-            {mode === "direct" && (
-              <div className="flex gap-3">
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value as "case" | "legislation")}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none"
-                >
-                  <option value="case">Cases</option>
-                  <option value="legislation">Legislation</option>
-                </select>
-                <select
-                  value={jurisdiction}
-                  onChange={(e) => setJurisdiction(e.target.value)}
-                  className="rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-indigo-500 focus:outline-none"
-                >
-                  {JURISDICTIONS.map((j) => (
-                    <option key={j.value} value={j.value}>
-                      {j.label}
-                    </option>
+            <details className="group">
+              <summary className="cursor-pointer text-xs font-medium text-slate-500 hover:text-slate-700">
+                Filter by court/tribunal
+              </summary>
+              <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Courts</p>
+                  {NSW_COURTS.map((c) => (
+                    <label key={c.value} className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={courts.includes(c.value)}
+                        onChange={() => toggleCourt(c.value)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      {c.label}
+                    </label>
                   ))}
-                </select>
+                </div>
+                <div>
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tribunals</p>
+                  {NSW_TRIBUNALS.map((t) => (
+                    <label key={t.value} className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={tribunals.includes(t.value)}
+                        onChange={() => toggleTribunal(t.value)}
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      {t.label}
+                    </label>
+                  ))}
+                </div>
               </div>
-            )}
+            </details>
 
-            {mode === "nsw" && (
-              <div className="space-y-2">
-                <details className="group">
-                  <summary className="cursor-pointer text-xs font-medium text-slate-500 hover:text-slate-700">
-                    Filter by court/tribunal
-                  </summary>
-                  <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
-                    <div>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Courts</p>
-                      {NSW_COURTS.map((c) => (
-                        <label key={c.value} className="flex items-center gap-1.5 text-xs text-slate-600">
-                          <input
-                            type="checkbox"
-                            checked={nswCourts.includes(c.value)}
-                            onChange={() => toggleNswCourt(c.value)}
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          {c.label}
-                        </label>
-                      ))}
-                    </div>
-                    <div>
-                      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tribunals</p>
-                      {NSW_TRIBUNALS.map((t) => (
-                        <label key={t.value} className="flex items-center gap-1.5 text-xs text-slate-600">
-                          <input
-                            type="checkbox"
-                            checked={nswTribunals.includes(t.value)}
-                            onChange={() => toggleNswTribunal(t.value)}
-                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                          {t.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </details>
-                <p className="text-xs text-slate-400">
-                  Searches caselaw.nsw.gov.au directly. Leave court/tribunal filters empty to search all.
-                </p>
-              </div>
-            )}
-
-            {mode === "ai" && (
-              <p className="text-xs text-slate-400">
-                Claude interprets your question, selects the right MCP tools, and summarises the results.
-              </p>
-            )}
+            <p className="text-xs text-slate-400">
+              Searches caselaw.nsw.gov.au directly. Leave court/tribunal filters empty to search all.
+            </p>
           </form>
         </div>
 
         {/* Loading state */}
-        {loading && <LoadingSpinner mode={mode} />}
+        {loading && <LoadingSpinner />}
 
         {/* Error */}
         {error && !loading && (
@@ -408,34 +233,25 @@ export default function Home() {
           </div>
         )}
 
-        {/* Search params */}
-        {searchParams && !loading && (
-          <div className="mt-6 rounded-lg bg-slate-100 px-4 py-2">
-            <p className="font-mono text-xs text-slate-500">
-              tool={searchParams.tool || "search_cases"} query=&quot;{searchParams.query}&quot; jurisdiction={searchParams.jurisdiction || "all"} method={searchParams.method}
-            </p>
-          </div>
-        )}
-
-        {/* NSW results count + pagination */}
-        {mode === "nsw" && nswTotalResults > 0 && !loading && (
+        {/* Results count + pagination */}
+        {totalResults > 0 && !loading && (
           <div className="mt-6 flex items-center justify-between">
             <p className="text-sm text-slate-500">
-              {nswTotalResults.toLocaleString()} result{nswTotalResults !== 1 ? "s" : ""} found
-              {nswTotalPages > 1 && ` — page ${nswPage + 1} of ${nswTotalPages}`}
+              {totalResults.toLocaleString()} result{totalResults !== 1 ? "s" : ""} found
+              {totalPages > 1 && ` — page ${page + 1} of ${totalPages}`}
             </p>
-            {nswTotalPages > 1 && (
+            {totalPages > 1 && (
               <div className="flex gap-2">
                 <button
-                  disabled={nswPage === 0}
-                  onClick={(e) => { setNswPage(nswPage - 1); handleSearch(e, nswPage - 1); }}
+                  disabled={page === 0}
+                  onClick={(e) => { setPage(page - 1); handleSearch(e, page - 1); }}
                   className="rounded border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-30"
                 >
                   Previous
                 </button>
                 <button
-                  disabled={nswPage >= nswTotalPages - 1}
-                  onClick={(e) => { setNswPage(nswPage + 1); handleSearch(e, nswPage + 1); }}
+                  disabled={page >= totalPages - 1}
+                  onClick={(e) => { setPage(page + 1); handleSearch(e, page + 1); }}
                   className="rounded border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-30"
                 >
                   Next
@@ -445,27 +261,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* AI Summary */}
-        {interpretation && !loading && (
-          <div className="mt-6 rounded-xl border border-indigo-200 bg-indigo-50/50 p-6">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-5 w-5 items-center justify-center rounded bg-indigo-600 text-[10px] font-bold text-white">AI</div>
-              <p className="text-sm font-semibold text-indigo-800">Summary</p>
-            </div>
-            <div className="prose prose-sm max-w-none text-slate-700 prose-strong:text-slate-900 prose-headings:text-slate-900 prose-li:my-0.5">
-              <ReactMarkdown>{interpretation}</ReactMarkdown>
-            </div>
-          </div>
-        )}
-
         {/* Results */}
         {results.length > 0 && !loading && (
-          <div className="mt-6 space-y-3">
-            {mode !== "nsw" && (
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                {results.length} result{results.length !== 1 ? "s" : ""}
-              </h2>
-            )}
+          <div className="mt-4 space-y-3">
             {results.map((r, i) => (
               <div
                 key={i}
@@ -482,26 +280,13 @@ export default function Home() {
                   </h3>
                 </a>
                 <div className="mt-1.5 flex flex-wrap gap-2 text-sm">
-                  {(r.neutralCitation || r.citation) && (
+                  {r.citation && (
                     <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                      {r.neutralCitation || r.citation}
-                    </span>
-                  )}
-                  {r.reportedCitation && (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                      {r.reportedCitation}
-                    </span>
-                  )}
-                  {r.jurisdiction && (
-                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium uppercase text-emerald-700">
-                      {r.jurisdiction}
+                      {r.citation}
                     </span>
                   )}
                   {r.decisionDate && (
                     <span className="text-xs text-slate-400">{r.decisionDate}</span>
-                  )}
-                  {r.year && !r.decisionDate && (
-                    <span className="text-xs text-slate-400">{r.year}</span>
                   )}
                   {r.judge && (
                     <span className="text-xs text-slate-400">Before: {r.judge}</span>
@@ -510,58 +295,16 @@ export default function Home() {
                 {r.catchwords && (
                   <p className="mt-2 text-sm text-slate-500 line-clamp-2">{r.catchwords}</p>
                 )}
-                {r.summary && !r.catchwords && (
-                  <p className="mt-2 text-sm text-slate-500">{r.summary}</p>
-                )}
               </div>
             ))}
           </div>
         )}
 
-        {/* Features + examples — show when no search has been made */}
+        {/* Empty state */}
         {!hasSearched && !loading && (
-          <div className="mt-10 grid gap-8 md:grid-cols-2">
-            {/* Example queries */}
-            <div>
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Try asking
-              </h2>
-              <div className="space-y-2">
-                {EXAMPLE_QUERIES.map((ex, i) => (
-                  <button
-                    key={i}
-                    onClick={() => handleExampleClick(ex.query)}
-                    className="group block w-full rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition-all hover:border-indigo-300 hover:shadow-sm"
-                  >
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                      {ex.category}
-                    </span>
-                    <p className="mt-0.5 text-sm text-slate-700 group-hover:text-indigo-700">
-                      &ldquo;{ex.query}&rdquo;
-                    </p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Features */}
-            <div>
-              <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                MCP Server Features
-              </h2>
-              <div className="rounded-xl border border-slate-200 bg-white p-5">
-                <ul className="space-y-2.5">
-                  {FEATURES.map((f, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm text-slate-600">
-                      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] text-emerald-600">
-                        &#10003;
-                      </span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+          <div className="mt-10 text-center text-sm text-slate-400">
+            <p>Search decisions from NSW courts and tribunals.</p>
+            <p className="mt-1">Try searching for a topic, case name, party, or legislation.</p>
           </div>
         )}
       </main>
