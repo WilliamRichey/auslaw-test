@@ -7,9 +7,16 @@ interface SearchResult {
   title: string;
   url: string;
   decisionDate?: string;
+  decision_date?: string;
   judge?: string;
   catchwords?: string;
   citation?: string;
+  neutral_citation?: string;
+  jurisdiction?: string;
+  court?: string;
+  court_code?: string;
+  year?: number;
+  source?: string;
 }
 
 const NSW_COURTS = [
@@ -164,8 +171,8 @@ export default function Home() {
               WR
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900">NSW CaseLaw Search</h1>
-              <p className="text-xs text-slate-400">caselaw.nsw.gov.au</p>
+              <h1 className="text-xl font-bold text-slate-900">Australian Legal Research</h1>
+              <p className="text-xs text-slate-400">NSW CaseLaw + AustLII</p>
             </div>
           </div>
         </div>
@@ -367,16 +374,32 @@ export default function Home() {
                   </h3>
                 </a>
                 <div className="mt-1.5 flex flex-wrap gap-2 text-sm">
-                  {r.citation && (
+                  {(r.citation || r.neutral_citation) && (
                     <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                      {r.citation}
+                      {r.citation || r.neutral_citation}
                     </span>
                   )}
-                  {r.decisionDate && (
-                    <span className="text-xs text-slate-400">{r.decisionDate}</span>
+                  {r.jurisdiction && (
+                    <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium uppercase text-emerald-700">
+                      {r.jurisdiction}
+                    </span>
+                  )}
+                  {(r.court || r.court_code) && (
+                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                      {r.court || r.court_code}
+                    </span>
+                  )}
+                  {(r.decisionDate || r.decision_date) && (
+                    <span className="text-xs text-slate-400">{r.decisionDate || r.decision_date}</span>
+                  )}
+                  {!r.decisionDate && !r.decision_date && r.year && (
+                    <span className="text-xs text-slate-400">{r.year}</span>
                   )}
                   {r.judge && (
                     <span className="text-xs text-slate-400">Before: {r.judge}</span>
+                  )}
+                  {r.source === "austlii" && (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">AustLII</span>
                   )}
                 </div>
                 {r.catchwords && (
